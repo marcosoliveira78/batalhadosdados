@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batalha dos Dados - Regras Interativas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Visualization & Content Choices:
+        - Visão Geral: Text block. Goal: Inform. Method: HTML paragraph. Interaction: None.
+        - Componentes: List. Goal: Inform. Method: HTML list. Interaction: None.
+        - Preparação: Numbered list. Goal: Inform. Method: HTML ordered list. Interaction: None.
+        - Desenrolar das Rodadas: Headings and text blocks. Goal: Inform. Method: HTML headings/paragraphs. Interaction: None.
+        - Cartas de Ação: Interactive card display. Goal: Organize & Inform. Method: HTML styled divs for cards, JS for filtering by category. Interaction: Click category buttons to show/hide relevant cards. Justification: Allows users to easily find and understand specific card types and their effects, crucial for game strategy.
+        - Final da Batalha: Text block. Goal: Inform. Method: HTML paragraph. Interaction: None.
+        - Gerar PDF: Button to trigger browser print. Goal: Provide export option. Method: HTML button, JS window.print(). Interaction: Click to print/save PDF.
+        - No complex charts (Chart.js/Plotly.js) are necessary as the data is primarily descriptive rules and card effects.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .nav-button.active {
+            background-color: #059669; /* emerald-600 */
+            color: white;
+        }
+        .nav-button {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .card-item {
+            border: 1px solid #d1d5db; /* gray-300 */
+            background-color: white;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .filter-button.active {
+            background-color: #047857; /* emerald-700 */
+            color: white;
+        }
+         /* Custom scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #059669; /* emerald-600 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #047857; /* emerald-700 */
+        }
+        @media print {
+            @page {
+                size: A4; /* Define o tamanho da página para A4 */
+                margin: 1cm; /* Define margens para a impressão */
+            }
+            nav, footer, .filter-button, .nav-button[data-target="print-pdf"] {
+                display: none !important;
+            }
+            main {
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            section {
+                box-shadow: none !important;
+                border: none !important;
+                padding: 1rem !important;
+                margin-bottom: 0 !important;
+                page-break-before: always; /* Force new page for each section */
+            }
+            #visao-geral {
+                page-break-before: avoid; /* Don't force a page break before the very first section */
+            }
+            .content-section {
+                display: block !important; /* Ensure all sections are visible for printing */
+            }
+            /* Specific styling for cards-acao section for print */
+            #cartas-acao #cards-container {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr); /* 2 columns for print */
+                gap: 1rem; /* Adjust gap for print */
+            }
+            #cartas-acao .card-item {
+                padding: 0.5rem; /* Reduce padding for print */
+                font-size: 0.8em; /* Optionally reduce font size slightly */
+            }
+            #cartas-acao .card-item h4 {
+                font-size: 1.1em; /* Adjust heading size */
+            }
+            #cartas-acao .card-item p {
+                font-size: 0.75em; /* Adjust description size */
+            }
+            /* Force page break after every 10 cards in print */
+            .print-page-break-after-10 {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body class="bg-stone-100 text-stone-800 min-h-screen flex flex-col">
+
+    <header class="bg-emerald-700 text-white p-6 shadow-lg">
+        <div class="container mx-auto max-w-5xl text-center">
+            <h1 class="text-4xl font-bold">🎲 Batalha dos Dados ⚔️</h1>
+            <p class="text-lg mt-2">Guia Interativo de Regras</p>
+        </div>
+    </header>
+
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto max-w-5xl flex flex-wrap justify-center p-2 space-x-1 sm:space-x-2">
+            <button class="nav-button px-3 py-2 sm:px-4 sm:py-2 rounded-md text-sm sm:text-base font-medium hover:bg-emerald-500 hover:text-white active" data-target="visao-geral">Visão Geral</button>
+            <button class="nav-button px-3 py-2 sm:px-4 sm:py-2 rounded-md text-sm sm:text-base font-medium hover:bg-emerald-500 hover:text-white" data-target="componentes">Componentes</button>
+            <button class="nav-button px-3 py-2 sm:px-4 sm:py-2 rounded-md text-sm sm:text-base font-medium hover:bg-emerald-500 hover:text-white" data-target="preparacao">Preparação</button>
+            <button class="nav-button px-3 py-2 sm:px-4 sm:py-2 rounded-md text-sm sm:text-base font-medium hover:bg-emerald-500 hover:text-white" data-target="rodadas">Rodadas</button>
+            <button class="nav-button px-3 py-2 sm:px-4 sm:py-2 rounded-md text-sm sm:text-base font-medium hover:bg-emerald-500 hover:text-white" data-target="cartas-acao">Cartas de Ação</button>
+            <button class="nav-button px-3 py-2 sm:px-4 sm:py-2 rounded-md text-sm sm:text-base font-medium hover:bg-emerald-500 hover:text-white" data-target="final-batalha">Final da Batalha</button>
+            <button class="nav-button px-3 py-2 sm:px-4 sm:py-2 rounded-md text-sm sm:text-base font-medium bg-emerald-600 text-white hover:bg-emerald-700" data-target="print-pdf">Gerar PDF</button>
+        </div>
+    </nav>
+
+    <main class="container mx-auto max-w-4xl p-4 sm:p-6 flex-grow">
+        <section id="visao-geral" class="content-section active bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-3xl font-semibold text-emerald-700 mb-6 border-b-2 border-emerald-200 pb-2">🎯 Visão Geral e Objetivo do Jogo</h2>
+            <p class="mb-4 text-lg leading-relaxed">
+                Bem-vindo ao empolgante mundo de <span class="font-bold text-emerald-800">Batalha dos Dados</span>! Este jogo é uma fusão perfeita entre a imprevisibilidade da <span class="font-bold text-emerald-800">sorte dos dados</span> e a profundidade da <span class="font-bold text-emerald-800">estratégia das cartas de ação</span>, onde cada decisão com suas cartas de ação pode mudar o rumo da partida.
+            </p>
+            <p class="text-stone-700 leading-relaxed space-y-3">
+                O objetivo principal é simples, mas desafiador: ao final de um mínimo de <span class="font-bold text-emerald-800">três rodadas</span>, o jogador que tiver <span class="font-bold text-emerald-800">acumulado mais pontos</span> será o grande vencedor. Em cada rodada, os jogadores se revezam utilizando suas poderosas cartas para <span class="font-bold text-emerald-800">manipular os resultados</span> dos dados, que são então lançados. A partir desses lançamentos, são calculados <span class="font-bold text-emerald-800">bônus e ônus</span> que impactam diretamente a <span class="font-bold text-emerald-800">pontuação final</span>. Cada escolha de carta e cada lançamento de dado são cruciais, exigindo <span class="font-bold text-emerald-800">estratégias ousadas</span> e <span class="font-bold text-emerald-800">raciocínio rápido</span>. Prepare-se para uma experiência de jogo dinâmica e cheia de reviravoltas!
+            </p>
+        </section>
+
+        <section id="componentes" class="content-section bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-3xl font-semibold text-emerald-700 mb-6 border-b-2 border-emerald-200 pb-2">📦 Componentes do Jogo</h2>
+            <p class="mb-4 text-lg leading-relaxed">
+                Para mergulhar na Batalha dos Dados, você precisará dos seguintes componentes essenciais. Certifique-se de ter todos eles à mão antes de iniciar sua jornada estratégica!
+            </p>
+            <ul class="list-disc list-inside space-y-3 text-stone-700 leading-relaxed">
+                <li>
+                    <strong>Dados:</strong> O jogo utiliza <span class="font-bold text-emerald-800">5 dados</span> comuns de seis faces. Estes dados são compartilhados entre todos os jogadores e serão usados em cada rodada para determinar os resultados que suas cartas de ação irão manipular.
+                </li>
+                <li>
+                    <strong>Cartas de Ação:</strong> O baralho de Batalha dos Dados é composto por <span class="font-bold text-emerald-800">58 cartas</span> únicas. Estas cartas são o coração da sua estratégia, permitindo que você <span class="font-bold text-emerald-800">modifique o resultado final</span> dos dados, afete a pontuação dos adversários e utilize táticas especiais.
+                    <ul class="list-circle list-inside ml-6 mt-2 space-y-1">
+                        <li>As cartas de ação devem ser <span class="font-bold text-emerald-800">jogadas estrategicamente antes</span> de cada rodada de arremessos de dados.</li>
+                        <li>Uma vez jogada, uma carta só pode ser usada <span class="font-bold text-emerald-800">uma vez por rodada</span>. Após o cálculo da pontuação da rodada, todas as cartas usadas <span class="font-bold text-emerald-800">voltam para a base do monte</span> de compras.</li>
+                        <li>É importante notar que os jogadores não são obrigados a jogar cartas em uma rodada. Cartas que não forem usadas podem ser <span class="font-bold text-emerald-800">guardadas para rodadas futuras</span>, adicionando uma camada extra de planejamento estratégico.</li>
+                    </ul>
+                </li>
+                <li>
+                    <strong>Folha de Pontuação:</strong> Para manter o controle do progresso de cada jogador e da classificação parcial, é fundamental reservar uma <span class="font-bold text-emerald-800">folha de papel</span> (ou utilizar um aplicativo de pontuação, se preferir) para <span class="font-bold text-emerald-800">registrar a pontuação acumulada</span> de cada participante ao longo das rodadas.
+                </li>
+            </ul>
+        </section>
+
+        <section id="preparacao" class="content-section bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-3xl font-semibold text-emerald-700 mb-6 border-b-2 border-emerald-200 pb-2">🛠️ Preparação para a Batalha</h2>
+            <p class="mb-4 text-lg leading-relaxed">
+                Antes de iniciar a Batalha dos Dados, siga estes passos simples para garantir que tudo esteja pronto para uma partida emocionante e sem interrupções. Uma boa preparação é a chave para um jogo fluido e divertido!
+            </p>
+            <ol class="list-decimal list-inside space-y-3 text-stone-700 leading-relaxed">
+                <li>
+                    <span class="font-bold text-emerald-800">Organize os Dados:</span> Pegue os <span class="font-bold text-emerald-800">5 dados</span> e reserve-os em um local acessível. Eles serão <span class="font-bold text-emerald-800">compartilhados entre si</span> por todos os jogadores durante a partida.
+                </li>
+                <li>
+                    <span class="font-bold text-emerald-800">Distribuição Inicial de Cartas:</span> Cada jogador deve receber <span class="font-bold text-emerald-800">5 cartas de ação</span> do baralho. Estas serão suas cartas iniciais para começar a traçar suas estratégias.
+                </li>
+                <li>
+                    <span class="font-bold text-emerald-800">Forme o Monte de Compras:</span> Embaralhe cuidadosamente o restante das cartas de ação e coloque-as viradas para baixo no centro da mesa, formando um <span class="font-bold text-emerald-800">monte de compras</span>. Este será o local de onde novas cartas serão distribuídas.
+                </li>
+                <li>
+                    <span class="font-bold text-emerald-800">Distribuição Contínua de Cartas:</span> A cada nova rodada, cada jogador receberá <span class="font-bold text-emerald-800">2 cartas novas a cada rodada</span> do monte de compras. A distribuição começa com a <span class="font-bold text-emerald-800">pessoa que inicia a rodada</span> atual e segue no sentido horário.
+                </li>
+            </ol>
+        </section>
+
+        <section id="rodadas" class="content-section bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-3xl font-semibold text-emerald-700 mb-6 border-b-2 border-emerald-200 pb-2">🔄 Desenrolar das Rodadas</h2>
+            <p class="mb-6 text-lg leading-relaxed">
+                O jogo Batalha dos Dados se desenrola em uma série de <span class="font-bold text-emerald-800">rodadas dinâmicas</span>. Cada rodada segue um fluxo específico, garantindo que a combinação de estratégia e sorte seja sempre presente. Entenda cada etapa para dominar o campo de batalha!
+            </p>
+            
+            <div class="space-y-6 text-stone-700 leading-relaxed">
+                <div>
+                    <h3 class="text-2xl font-medium text-emerald-600 mb-3">1. Sorteio da Ordem</h3>
+                    <p>
+                        Antes da <span class="font-bold text-emerald-800">primeira rodada</span> do jogo, para determinar quem terá a vantagem de iniciar, todos os jogadores devem lançar <span class="font-bold text-emerald-800">2 dados</span>. O jogador que obtiver a <span class="font-bold text-emerald-800">maior soma total nos dados</span> será o primeiro a iniciar a rodada. Isso significa que ele será o primeiro a realizar a fase de jogar cartas e, subsequentemente, o primeiro a lançar os dados.
+                    </p>
+                    <p>
+                        Em caso de <span class="font-bold text-emerald-800">empate</span> na soma dos dados, os jogadores que empataram devem lançar os dados novamente. Este processo se repete até que haja um desempate claro, garantindo que apenas um jogador inicie a rodada.
+                    </p>
+                    <p>
+                        A ordem de jogo, após o jogador inicial ser definido, segue rigorosamente no <span class="font-bold text-emerald-800">sentido horário</span> ao redor da mesa. Para as rodadas subsequentes (segunda rodada em diante), o jogador que iniciará a rodada será sempre aquele que está imediatamente à <span class="font-bold text-emerald-800">esquerda do jogador que iniciou a rodada anterior</span>. Isso assegura que a vez de começar o jogo circule de forma justa entre todos os participantes, adicionando uma camada de imprevisibilidade e estratégia à longo prazo.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-medium text-emerald-600 mb-3">2. Distribuição de Novas Cartas</h3>
+                    <p>
+                        No <span class="font-bold text-emerald-800">início de cada nova rodada</span>, antes que qualquer carta seja jogada ou dado seja lançado, cada jogador deve comprar <span class="font-bold text-emerald-800">duas novas cartas de ação</span> do monte de compras. Estas cartas são imediatamente adicionadas à mão do jogador, expandindo suas opções estratégicas para a rodada atual e as futuras.
+                    </p>
+                    <p>
+                        O jogador tem a total liberdade de <span class="font-bold text-emerald-800">usar as cartas imediatamente</span> nesta rodada, se elas se encaixarem em sua estratégia atual, ou pode optar por <span class="font-bold text-emerald-800">guardá-las para rodadas futuras</span>. A decisão de usar ou guardar as cartas adiciona uma camada de planejamento e flexibilidade, pois cartas não utilizadas podem ser valiosas em momentos mais críticos do jogo.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-medium text-emerald-600 mb-3">3. Decisão Estratégica: Lançamento das Cartas de Ação</h3>
+                    <p>
+                        Esta é a fase crucial onde a estratégia realmente entra em jogo. Os jogadores, seguindo a ordem de jogo estabelecida (sentido horário, começando pelo jogador da vez), escolhem secretamente as cartas de ação que desejam utilizar nesta rodada. Uma vez que o jogador da vez tenha escolhido e revelado sua carta, o próximo jogador na ordem faz o mesmo, e assim por diante, até que todos os jogadores tenham tido a oportunidade de jogar suas cartas.
+                    </p>
+                    <p>
+                        É de extrema importância ressaltar que as cartas de ação, uma vez reveladas, <span class="font-bold text-emerald-800">não podem ser trocadas ou retiradas</span>. <span class="font-bold text-red-700">Exceção:</span> Se a carta "Perde a Vez" for jogada por um adversário, o jogador afetado, caso já tenha jogado alguma carta nesta rodada, deve recolher suas cartas de volta para a mão. Ele não poderá jogar cartas nem lançar dados nesta rodada. A decisão é final. Após a revelação de todas as cartas (e resolução de efeitos como "Perde a Vez"), a fase de <span class="font-bold text-emerald-800">arremessos de dados se inicia</span>. A <span class="font-bold text-emerald-800">ordem em que as cartas foram reveladas</span> (sempre respeitando a ordem de jogo) será a ordem em que seus efeitos serão aplicados. Isso significa que a sequência de ativação das cartas pode ser tão importante quanto a carta em si.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-medium text-emerald-600 mb-3">4. Lançamento dos Dados</h3>
+                    <p>
+                        Com as cartas de ação já reveladas e seus efeitos prontos para serem aplicados, inicia-se a fase de <span class="font-bold text-emerald-800">arremessos dos dados</span>. Cada jogador, em sua vez (seguindo a mesma ordem de jogo), deve lançar seus <span class="font-bold text-emerald-800">5 dados simultaneamente</span>.
+                    </p>
+                    <p>
+                        Os resultados obtidos nesses dados serão a <span class="font-bold text-emerald-800">base inicial para o cálculo da pontuação</span> da rodada. É sobre esses resultados que os efeitos das cartas de ação serão aplicados, transformando o valor bruto do lançamento em sua pontuação final para a rodada.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-medium text-emerald-600 mb-3">5. Cálculo da Pontuação</h3>
+                    <p>
+                        Após o lançamento dos dados de cada jogador, é hora de realizar o <span class="font-bold text-emerald-800">cálculo da pontuação da rodada</span>. Primeiramente, <span class="font-bold text-emerald-800">some o resultado obtido</span> nos 5 dados.
+                    </p>
+                    <p>
+                        Em seguida, os jogadores devem aplicar os <span class="font-bold text-emerald-800">efeitos das cartas de ação</span> que foram jogadas durante a fase de Decisão Estratégica. É crucial respeitar a <span class="font-bold text-emerald-800">ordem em que as cartas foram reveladas</span>, pois a sequência de aplicação dos efeitos pode alterar significativamente o resultado final. Os efeitos das cartas podem incluir adicionar, subtrair, multiplicar ou dividir pontos, ajustando assim a <span class="font-bold text-emerald-800">pontuação total da rodada</span> para cada jogador.
+                    </p>
+                    <p>
+                        Após todos os cálculos e ajustes, <span class="font-bold text-emerald-800">registre cuidadosamente a pontuação final</span> de cada jogador para esta rodada na folha de pontuação. Esta pontuação será somada aos totais acumulados das rodadas anteriores.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="cartas-acao" class="content-section bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-3xl font-semibold text-emerald-700 mb-4 border-b-2 border-emerald-200 pb-2">🃏 Cartas de Ação: Arsenal Estratégico</h2>
+            <p class="mb-4 text-lg leading-relaxed">
+                As <span class="font-bold text-emerald-800">Cartas de Ação</span> são o <span class="font-bold text-emerald-800">coração da estratégia</span> em Batalha dos Dados. Elas oferecem um vasto leque de possibilidades para <span class="font-bold text-emerald-800">manipulação de pontos</span>, permitindo que você <span class="font-bold text-emerald-800">beneficie sua própria pontuação</span> ou <span class="font-bold text-emerald-800">impacte diretamente a pontuação de um adversário</span>. Dominar o uso dessas cartas é crucial para a vitória! As cartas são divididas nas categorias descritas a seguir, sempre <span class="font-bold text-emerald-800">impactam no total do arremesso</span> e suas <span class="font-bold text-emerald-800">ações devem ser escolhidas sempre antes do lançamento dos dados</span>.
+            </p>
+            
+            <p class="text-sm text-stone-600 mb-6 italic">*A quantidade de cada carta existente no baralho de 58 cartas está indicada entre parênteses.</p>
+
+            <div class="mb-6 flex flex-wrap justify-center gap-2">
+                <button class="filter-button px-4 py-2 rounded-md bg-emerald-500 text-white hover:bg-emerald-600 active" data-filter="todos">Todas</button>
+                <button class="filter-button px-4 py-2 rounded-md bg-emerald-500 text-white hover:bg-emerald-600" data-filter="adicao">Adição</button>
+                <button class="filter-button px-4 py-2 rounded-md bg-emerald-500 text-white hover:bg-emerald-600" data-filter="reducao">Redução</button>
+                <button class="filter-button px-4 py-2 rounded-md bg-emerald-500 text-white hover:bg-emerald-600" data-filter="multiplicacao">Multiplicação</button>
+                <button class="filter-button px-4 py-2 rounded-md bg-emerald-500 text-white hover:bg-emerald-600" data-filter="divisao">Divisão</button>
+                <button class="filter-button px-4 py-2 rounded-md bg-emerald-500 text-white hover:bg-emerald-600" data-filter="taticas">Táticas</button>
+            </div>
+
+            <div id="cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            </div>
+        </section>
+
+        <section id="final-batalha" class="content-section bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-3xl font-semibold text-emerald-700 mb-6 border-b-2 border-emerald-200 pb-2">🏆 Final da Batalha: Coroando o Vencedor</h2>
+            <p class="mb-4 text-lg leading-relaxed">
+                A Batalha dos Dados culmina em um momento de revelação, onde a habilidade estratégica e a sorte se encontram para coroar o campeão.
+            </p>
+            <p class="text-stone-700 leading-relaxed space-y-3">
+                Ao final de cada rodada, é crucial realizar o <span class="font-bold text-emerald-800">cálculo dos pontos obtidos</span> por cada jogador e somá-los ao total acumulado. Isso permite uma <span class="font-bold text-emerald-800">classificação parcial contínua</span>, mantendo todos a par de quem está liderando a partida.
+                O cálculo final para determinar o vencedor é direto: basta <span class="font-bold text-emerald-800">somar a pontuação total de todas as rodadas</span> para cada jogador. O jogador que alcançar o <span class="font-bold text-emerald-800">maior resultado final será coroado o vencedor</span> da Batalha dos Dados. Este título não apenas celebra a sorte nos lançamentos de dados, mas, principalmente, a <span class="font-bold text-emerald-800">maestria na utilização das cartas de ação</span>, demonstrando uma combinação perfeita de tática e adaptabilidade. Prepare-se para a emoção do resultado final!
+            </p>
+        </section>
+    </main>
+
+    <footer class="bg-emerald-800 text-emerald-200 text-center p-4 mt-8">
+        <p>&copy; Batalha dos Dados - Regras Interativas. Desenvolvido por Carol Oliveira. Divirta-se!</p>
+    </footer>
+
+    <script>
+        const navButtons = document.querySelectorAll('.nav-button');
+        const contentSections = document.querySelectorAll('.content-section');
+        const filterButtons = document.querySelectorAll('.filter-button');
+        const cardsContainer = document.getElementById('cards-container');
+
+        const allCardsData = [
+            { name: "+10 Power", quantity: 4, type: "adicao", description: "Adiciona 10 pontos.", categoryForFilter: "Adição" },
+            { name: "+5 Boost", quantity: 4, type: "adicao", description: "Adiciona 5 pontos.", categoryForFilter: "Adição" },
+            { name: "+3 Extra", quantity: 4, type: "adicao", description: "Adiciona 3 pontos.", categoryForFilter: "Adição" },
+            { name: "+2 Bônus", quantity: 4, type: "adicao", description: "Adiciona 2 pontos.", categoryForFilter: "Adição" },
+            { name: "-5 da Zueira", quantity: 4, type: "reducao", description: "Reduz 5 pontos de um adversário escolhido.", categoryForFilter: "Redução" },
+            { name: "-10 Maldito", quantity: 4, type: "reducao", description: "Reduz 10 pontos de um adversário escolhido.", categoryForFilter: "Redução" },
+            { name: "Double Up (X2)", quantity: 4, type: "multiplicacao", description: "Multiplica o total do arremesso por 2.", categoryForFilter: "Multiplicação" },
+            { name: "Triplo Turbo (X3)", quantity: 4, type: "multiplicacao", description: "Multiplica o total do arremesso por 3.", categoryForFilter: "Multiplicação" },
+            { name: "X5 Super (X5)", quantity: 4, type: "multiplicacao", description: "Multiplica o total do arremesso por 5.", categoryForFilter: "Multiplicação" },
+            { name: "Divisor Mortal (÷2)", quantity: 4, type: "divisao", description: "O adversário é obrigado a dividir com o jogador da carta os pontos obtidos no arremesso (metade para cada). Se o resultado da divisão não for um número inteiro, deve ser arredondado para baixo.", categoryForFilter: "Divisão" },
+            { name: "Troca Total", quantity: 2, type: "taticas", description: "Permite ao jogador trocar os pontos obtidos no arremesso atual com os de um adversário à sua escolha.", categoryForFilter: "Táticas" },
+            { name: "Combo Force", quantity: 4, type: "taticas", description: "Permite ao jogador usar mais 2 cartas extras na mesma rodada, combinando ações como somar, multiplicar, subtrair, defender, atacar e etc...", categoryForFilter: "Táticas" },
+            { name: "Escudo Protetor", quantity: 4, type: "taticas", description: "Anula o efeito de uma carta adversária que prejudique ou não o jogador em qualquer tempo da rodada.", categoryForFilter: "Táticas" },
+            { name: "Perde a Vez", quantity: 2, type: "taticas", description: "Impede um adversário de jogar cartas e lançar dados na rodada, inclusive se já tiver jogado, tem que retirar suas cartas que retornam para sua mão.", categoryForFilter: "Táticas" },
+            { name: "Dado da Sorte", quantity: 1, type: "taticas", description: "Antes do arremesso, o jogador rola um dado. Se o número for par, multiplica os pontos obtidos por 10; se for ímpar, multiplica por 5.", categoryForFilter: "Táticas" },
+            { name: "Duelo Radical", quantity: 1, type: "taticas", description: "Permite desafiar o líder geral para uma jogada extra no final da rodada atual, usando 3 dados. O vencedor do duelo, arremessa um dado, multiplica o seu resultado por 10 e soma esses pontos ao seu resultado.", categoryForFilter: "Táticas" },
+            { name: "Ponto Perfeito", quantity: 1, type: "taticas", description: "Concede 50 pontos extras se a soma dos 5 dados após o arremesso for múltiplo de 5. Se for múltiplo de 3, concede 30 pontos e 20 pontos para múltiplos de 2. As interseções dão direito aos valores respectivos somados.", categoryForFilter: "Táticas" },
+            { name: "Azar Fatal", quantity: 1, type: "taticas", description: "O jogador escolhe um adversário. Se o total do arremesso do adversário for par, a pontuação da rodada do adversário é dividida por 2. Se for ímpar, a pontuação é dividida por 3 e arredondada para o inteiro abaixo mais próximo.", categoryForFilter: "Táticas" },
+            { name: "Trio Mágico", quantity: 1, type: "taticas", description: "Se o jogador obtiver 3 números iguais no arremesso, soma estes 3 números e multiplica por 10 adicionando o resultado em sua pontuação da rodada.", categoryForFilter: "Táticas" },
+            { name: "Força Seletiva", quantity: 1, type: "taticas", description: "Permite escolher o dado de maior valor do arremesso e multiplicá-lo pelo segundo maior valor e adicionar o resultado ao total do arremesso.", categoryForFilter: "Táticas" }
+        ];
+
+        function getCardIcon(type) {
+            switch (type) {
+                case 'adicao': return '➕';
+                case 'reducao': return '➖';
+                case 'multiplicacao': return '✖️';
+                case 'divisao': return '➗';
+                case 'taticas': return '✨';
+                default: return '';
+            }
+        }
+
+        function displayCards(filter = 'todos') {
+            cardsContainer.innerHTML = '';
+            const filteredCards = filter === 'todos' ? allCardsData : allCardsData.filter(card => card.type === filter);
+
+            if (filteredCards.length === 0) {
+                cardsContainer.innerHTML = `<p class="col-span-full text-center text-stone-600">Nenhuma carta encontrada para esta categoria.</p>`;
+                return;
+            }
+
+            filteredCards.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'card-item p-4 rounded-lg shadow-md space-y-2';
+
+                // Add page break class for print after every 10 cards
+                if ((index + 1) % 10 === 0) {
+                    cardElement.classList.add('print-page-break-after-10');
+                }
+
+                let categoryColor = 'bg-gray-200';
+                if (card.type === 'adicao') categoryColor = 'bg-green-100 border-green-300';
+                else if (card.type === 'reducao') categoryColor = 'bg-red-100 border-red-300';
+                else if (card.type === 'multiplicacao') categoryColor = 'bg-blue-100 border-blue-300';
+                else if (card.type === 'divisao') categoryColor = 'bg-yellow-100 border-yellow-300';
+                else if (card.type === 'taticas') categoryColor = 'bg-purple-100 border-purple-300';
+
+                const categoryText = card.categoryForFilter ? card.categoryForFilter : 'Desconhecida';
+                const cardIcon = getCardIcon(card.type);
+
+                cardElement.innerHTML = `
+                    <h4 class="text-xl font-semibold text-emerald-700">${card.name}</h4>
+                    <p class="text-sm ${categoryColor.split(' ')[0]} text-gray-700 p-1 rounded inline-block">${cardIcon} ${categoryText} (${card.quantity} cartas)</p>
+                    <p class="text-stone-600">${card.description}</p>
+                `;
+                cardsContainer.appendChild(cardElement);
+            });
+        }
+
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.dataset.target;
+                
+                navButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                if (targetId === 'print-pdf') {
+                    window.print();
+                } else {
+                    contentSections.forEach(section => {
+                        if (section.id === targetId) {
+                            section.classList.add('active');
+                        } else {
+                            section.classList.remove('active');
+                        }
+                    });
+                    if (targetId === 'cartas-acao') {
+                        displayCards(); 
+                    }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        filterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const filterType = button.dataset.filter;
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                displayCards(filterType);
+            });
+        });
+        
+        displayCards();
+
+    </script>
+</body>
+</html>
