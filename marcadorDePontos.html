@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batalha dos Dados - Marcador de Pontos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* stone-100 */
+            color: #292524; /* stone-800 */
+        }
+        .container {
+            max-width: 960px;
+        }
+        .input-group label {
+            font-weight: 600;
+            color: #047857; /* emerald-700 */
+        }
+        .btn-primary {
+            background-color: #059669; /* emerald-600 */
+            color: white;
+            transition: background-color 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: #047857; /* emerald-700 */
+        }
+        .table-header {
+            background-color: #065f46; /* emerald-900 */
+            color: white;
+        }
+        .table-cell-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.25rem;
+            background-color: white;
+            text-align: center;
+        }
+        .total-row {
+            font-weight: 700;
+            background-color: #d1fae5; /* emerald-100 */
+            color: #065f46; /* emerald-900 */
+        }
+        /* Estilos para o pódio */
+        .podium-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            margin-top: 2rem;
+            min-height: 200px;
+        }
+        .podium-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 1rem;
+            margin: 0 0.5rem;
+            border-radius: 0.5rem 0.5rem 0 0;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: relative;
+            min-width: 120px;
+        }
+        .podium-step.first {
+            height: 180px;
+            background-color: #fbbf24; /* amber-400 */
+            z-index: 2;
+        }
+        .podium-step.second {
+            height: 140px;
+            background-color: #9ca3af; /* gray-400 */
+            z-index: 1;
+        }
+        .podium-step.third {
+            height: 120px; /* Increased height for 3rd place */
+            background-color: #b45309; /* amber-700 */
+            z-index: 1;
+        }
+        .podium-place {
+            font-size: 2.5rem;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+        .podium-player-name {
+            font-size: 1.2rem;
+            margin-bottom: 0.25rem;
+        }
+        .podium-score {
+            font-size: 1rem;
+        }
+        .podium-step:not(.first) {
+            margin-top: 40px; /* Adjust to align base with first place */
+        }
+        .podium-crown {
+            position: absolute;
+            top: -30px;
+            font-size: 2.5rem;
+            color: #fcd34d; /* amber-300 */
+        }
+
+        /* Estilos para arrastar e soltar */
+        .draggable-header {
+            cursor: grab;
+        }
+        .draggable-header.dragging {
+            opacity: 0.5;
+            border: 2px dashed #059669;
+        }
+        .draggable-header.drag-over {
+            background-color: #a7f3d0; /* emerald-200 */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8">
+
+    <header class="bg-emerald-700 text-white p-6 shadow-lg w-full">
+        <div class="container mx-auto text-center">
+            <h1 class="text-4xl font-bold">🎲 Batalha dos Dados ⚔️</h1>
+            <p class="text-lg mt-2">Marcador de Pontos</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 sm:p-6 flex-grow w-full">
+        <section id="setup-section" class="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold text-emerald-700 mb-4 border-b-2 border-emerald-200 pb-2">Configuração da Partida</h2>
+            
+            <div id="num-players-input-group" class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <div class="input-group flex-grow">
+                    <label for="num-players" class="block text-lg mb-1">Número de Jogadores:</label>
+                    <input type="number" id="num-players" min="2" value="2" class="w-full p-2 border border-gray-300 rounded-md text-center">
+                </div>
+                <button id="set-players-btn" class="btn-primary px-6 py-2 rounded-md text-lg mt-4 sm:mt-0">Definir Jogadores</button>
+            </div>
+
+            <div id="player-names-input-group" class="hidden mt-8">
+                <h3 class="text-xl font-semibold text-emerald-600 mb-4">Nomes dos Jogadores:</h3>
+                <div id="player-name-inputs" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    </div>
+                <button id="start-game-btn" class="btn-primary px-6 py-2 rounded-md text-lg">Iniciar Jogo</button>
+            </div>
+        </section>
+
+        <section id="score-section" class="bg-white p-6 rounded-lg shadow-lg hidden">
+            <h2 class="text-2xl font-semibold text-emerald-700 mb-4 border-b-2 border-emerald-200 pb-2">Pontuação da Batalha</h2>
+            
+            <div class="mb-4 flex justify-between items-center flex-wrap gap-2">
+                <h3 class="text-xl font-medium text-emerald-600">Rodada: <span id="current-round">1</span></h3>
+                <div class="flex gap-2">
+                    <button id="add-round-btn" class="btn-primary px-4 py-2 rounded-md text-base">Adicionar Rodada</button>
+                    <button id="end-game-btn" class="btn-primary bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md text-base">Finalizar Jogo</button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table id="score-table" class="min-w-full bg-white border border-gray-300 rounded-lg shadow-md">
+                    <thead>
+                        <tr class="table-header text-left">
+                            <th class="p-3 border-r border-emerald-800">Rodada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td class="p-3 border-r border-emerald-800">Total</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
+        <section id="ranking-section" class="bg-white p-6 rounded-lg shadow-lg hidden">
+            <h2 class="text-2xl font-semibold text-emerald-700 mb-4 border-b-2 border-emerald-200 pb-2">Classificação Final</h2>
+            
+            <div id="podium-container" class="podium-container mb-8">
+                </div>
+
+            <h3 class="text-xl font-medium text-emerald-600 mb-3">Outros Jogadores:</h3>
+            <ol id="other-players-list" class="list-decimal list-inside space-y-2 text-stone-700">
+                </ol>
+
+            <div class="text-center mt-8">
+                <button id="new-game-btn" class="btn-primary px-6 py-3 rounded-md text-lg">Novo Jogo</button>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-emerald-800 text-emerald-200 text-center p-4 mt-8 w-full">
+        <p>&copy; Batalha dos Dados - Marcador de Pontos. Desenvolvido por Carol Oliveira. Divirta-se!</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const numPlayersInput = document.getElementById('num-players');
+            const setPlayersBtn = document.getElementById('set-players-btn');
+            const startGameBtn = document.getElementById('start-game-btn');
+            const setupSection = document.getElementById('setup-section');
+            const numPlayersInputGroup = document.getElementById('num-players-input-group');
+            const playerNamesInputGroup = document.getElementById('player-names-input-group');
+            const playerNameInputsContainer = document.getElementById('player-name-inputs');
+            const scoreSection = document.getElementById('score-section');
+            const currentRoundSpan = document.getElementById('current-round');
+            const addRoundBtn = document.getElementById('add-round-btn');
+            const endGameBtn = document.getElementById('end-game-btn');
+            const scoreTable = document.getElementById('score-table');
+            const rankingSection = document.getElementById('ranking-section');
+            const podiumContainer = document.getElementById('podium-container');
+            const otherPlayersList = document.getElementById('other-players-list');
+            const newGameBtn = document.getElementById('new-game-btn');
+
+            let numPlayers = 0;
+            let currentRound = 1;
+            let playersData = []; // Array para armazenar objetos de jogador {id, name, totalScore}
+            let draggedHeader = null; // Variável para o cabeçalho arrastado
+
+            // Event listener para o botão "Definir Jogadores"
+            setPlayersBtn.addEventListener('click', () => {
+                numPlayers = parseInt(numPlayersInput.value);
+                if (isNaN(numPlayers) || numPlayers < 2) {
+                    // Usando uma mensagem modal personalizada em vez de alert()
+                    const messageBox = document.createElement('div');
+                    messageBox.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background-color: white;
+                        padding: 20px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                        z-index: 1000;
+                        text-align: center;
+                        font-family: 'Inter', sans-serif;
+                        color: #292524;
+                    `;
+                    messageBox.innerHTML = `
+                        <p class="mb-4">Por favor, insira um número válido de jogadores (mínimo 2).</p>
+                        <button class="btn-primary px-4 py-2 rounded-md" onclick="this.parentNode.remove()">OK</button>
+                    `;
+                    document.body.appendChild(messageBox);
+                    return;
+                }
+                generatePlayerNameInputs(numPlayers);
+                numPlayersInputGroup.classList.add('hidden');
+                playerNamesInputGroup.classList.remove('hidden');
+            });
+
+            // Event listener para o botão "Iniciar Jogo" (após nomear jogadores)
+            startGameBtn.addEventListener('click', () => {
+                playersData = []; // Limpa dados de jogadores anteriores
+                const nameInputs = playerNameInputsContainer.querySelectorAll('input[type="text"]');
+                let allNamesValid = true;
+                nameInputs.forEach((input, index) => {
+                    const playerName = input.value.trim();
+                    if (playerName === '') {
+                        allNamesValid = false;
+                        input.classList.add('border-red-500'); // Destaca entrada inválida
+                    } else {
+                        input.classList.remove('border-red-500');
+                        playersData.push({
+                            id: index + 1, // ID original do jogador (1-baseado)
+                            name: playerName,
+                            totalScore: 0 // Pontuação inicial
+                        });
+                    }
+                });
+
+                if (!allNamesValid) {
+                    const messageBox = document.createElement('div');
+                    messageBox.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background-color: white;
+                        padding: 20px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                        z-index: 1000;
+                        text-align: center;
+                        font-family: 'Inter', sans-serif;
+                        color: #292524;
+                    `;
+                    messageBox.innerHTML = `
+                        <p class="mb-4">Por favor, preencha todos os nomes dos jogadores.</p>
+                        <button class="btn-primary px-4 py-2 rounded-md" onclick="this.parentNode.remove()">OK</button>
+                    `;
+                    document.body.appendChild(messageBox);
+                    return;
+                }
+
+                playerNamesInputGroup.classList.add('hidden');
+                scoreSection.classList.remove('hidden');
+                initializeScoreTable(); // Inicializa a tabela com os nomes dos jogadores
+                updateTotals(); // Inicializa os totais com zeros
+            });
+
+            // Event listener para adicionar nova rodada
+            addRoundBtn.addEventListener('click', () => {
+                currentRound++;
+                currentRoundSpan.textContent = currentRound;
+                addRoundToTable();
+                // Rola para o final da tabela para mostrar a nova rodada
+                scoreTable.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            });
+
+            // Event listener para finalizar o jogo
+            endGameBtn.addEventListener('click', () => {
+                finalizeGame();
+            });
+
+            // Event listener para iniciar um novo jogo
+            newGameBtn.addEventListener('click', () => {
+                resetGame();
+            });
+
+            // Função para gerar inputs de nome para os jogadores
+            function generatePlayerNameInputs(count) {
+                playerNameInputsContainer.innerHTML = '';
+                for (let i = 1; i <= count; i++) {
+                    const div = document.createElement('div');
+                    div.className = 'input-group';
+                    div.innerHTML = `
+                        <label for="player-name-${i}" class="block text-sm mb-1">Jogador ${i}:</label>
+                        <input type="text" id="player-name-${i}" placeholder="Nome do Jogador ${i}" class="w-full p-2 border border-gray-300 rounded-md">
+                    `;
+                    playerNameInputsContainer.appendChild(div);
+                }
+            }
+
+            // Função para inicializar a tabela de pontuação
+            function initializeScoreTable() {
+                const theadRow = scoreTable.querySelector('thead tr');
+                const tbody = scoreTable.querySelector('tbody');
+                const tfootRow = scoreTable.querySelector('tfoot tr');
+
+                // Limpa o conteúdo anterior da tabela
+                theadRow.innerHTML = '<th class="p-3 border-r border-emerald-800">Rodada</th>';
+                tbody.innerHTML = '';
+                tfootRow.innerHTML = '<td class="p-3 border-r border-emerald-800">Total</td>';
+
+                // Adiciona colunas dos jogadores ao cabeçalho e rodapé com base na ordem de playersData
+                playersData.forEach(player => {
+                    const th = document.createElement('th');
+                    th.className = 'p-3 border-r border-emerald-800 draggable-header';
+                    th.textContent = player.name;
+                    th.setAttribute('data-player-id', player.id); // Armazena o ID original para referência
+                    th.setAttribute('draggable', 'true'); // Torna arrastável
+                    theadRow.appendChild(th);
+
+                    const tdTotal = document.createElement('td');
+                    tdTotal.id = `total-player-${player.id}`; // Usa o ID original para exibição do total
+                    tdTotal.className = 'p-3 text-center';
+                    tdTotal.textContent = '0';
+                    tfootRow.appendChild(tdTotal);
+                });
+
+                currentRound = 1;
+                currentRoundSpan.textContent = currentRound;
+                addRoundToTable(); // Adiciona a primeira rodada
+                addDragDropListeners(); // Adiciona listeners de arrastar e soltar aos cabeçalhos
+            }
+
+            // Função para adicionar uma nova rodada à tabela
+            function addRoundToTable() {
+                const tbody = scoreTable.querySelector('tbody');
+                const newRow = document.createElement('tr');
+                newRow.className = 'border-b border-gray-200';
+                newRow.setAttribute('data-round', currentRound);
+
+                const roundCell = document.createElement('td');
+                roundCell.className = 'p-3 border-r border-gray-300 font-semibold';
+                roundCell.textContent = currentRound;
+                newRow.appendChild(roundCell);
+
+                // Cria células com base na ordem atual de playersData
+                playersData.forEach(player => {
+                    const scoreCell = document.createElement('td');
+                    scoreCell.className = 'p-3 border-r border-gray-300';
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.value = '0';
+                    input.min = '0';
+                    input.className = 'table-cell-input';
+                    input.setAttribute('data-player-id', player.id); // Usa o ID original
+                    input.addEventListener('input', updateTotals);
+                    scoreCell.appendChild(input);
+                    newRow.appendChild(scoreCell);
+                });
+                tbody.appendChild(newRow);
+            }
+
+            // Função para atualizar os totais dos jogadores
+            function updateTotals() {
+                playersData.forEach(player => {
+                    let playerTotal = 0;
+                    // Seleciona inputs com base no ID original do jogador
+                    const playerInputs = document.querySelectorAll(`#score-table tbody input[data-player-id="${player.id}"]`);
+                    playerInputs.forEach(input => {
+                        playerTotal += parseInt(input.value) || 0;
+                    });
+                    player.totalScore = playerTotal; // Atualiza totalScore em playersData
+                    document.getElementById(`total-player-${player.id}`).textContent = playerTotal;
+                });
+            }
+
+            // Lógica de arrastar e soltar para os cabeçalhos da tabela
+            function addDragDropListeners() {
+                const draggableHeaders = scoreTable.querySelectorAll('.draggable-header');
+                draggableHeaders.forEach(header => {
+                    header.addEventListener('dragstart', handleDragStart);
+                    header.addEventListener('dragover', handleDragOver);
+                    header.addEventListener('dragleave', handleDragLeave);
+                    header.addEventListener('drop', handleDrop);
+                    header.addEventListener('dragend', handleDragEnd);
+                });
+            }
+
+            function handleDragStart(e) {
+                draggedHeader = this;
+                e.dataTransfer.effectAllowed = 'move';
+                this.classList.add('dragging');
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault(); // Necessário para permitir o drop
+                if (e.target.classList.contains('draggable-header') && e.target !== draggedHeader) {
+                    e.target.classList.add('drag-over');
+                }
+            }
+
+            function handleDragLeave(e) {
+                e.target.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                const targetHeader = e.target.closest('.draggable-header'); // Garante que pegamos o elemento de cabeçalho
+                if (targetHeader && targetHeader !== draggedHeader) {
+                    const draggedId = parseInt(draggedHeader.getAttribute('data-player-id'));
+                    const targetId = parseInt(targetHeader.getAttribute('data-player-id'));
+
+                    const draggedIndex = playersData.findIndex(p => p.id === draggedId);
+                    const targetIndex = playersData.findIndex(p => p.id === targetId);
+
+                    // Reordena o array playersData
+                    const [removed] = playersData.splice(draggedIndex, 1);
+                    playersData.splice(targetIndex, 0, removed);
+
+                    // Reconstrói todo o conteúdo da tabela para refletir a nova ordem
+                    rebuildTableContent();
+                }
+                e.target.classList.remove('drag-over');
+            }
+
+            function handleDragEnd(e) {
+                this.classList.remove('dragging');
+                draggedHeader = null;
+                // Remove quaisquer classes 'drag-over' restantes
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            }
+
+            // Função para reconstruir o conteúdo da tabela após reordenação de colunas
+            function rebuildTableContent() {
+                const theadRow = scoreTable.querySelector('thead tr');
+                const tbody = scoreTable.querySelector('tbody');
+                const tfootRow = scoreTable.querySelector('tfoot tr');
+
+                // Armazena os dados das rodadas atuais antes de limpar
+                const roundsData = [];
+                tbody.querySelectorAll('tr').forEach(row => {
+                    const roundNum = parseInt(row.getAttribute('data-round'));
+                    const roundScores = {};
+                    row.querySelectorAll('input').forEach(input => {
+                        roundScores[input.getAttribute('data-player-id')] = parseInt(input.value) || 0;
+                    });
+                    roundsData.push({ round: roundNum, scores: roundScores });
+                });
+
+                // Limpa o conteúdo da tabela
+                theadRow.innerHTML = '<th class="p-3 border-r border-emerald-800">Rodada</th>';
+                tbody.innerHTML = '';
+                tfootRow.innerHTML = '<td class="p-3 border-r border-emerald-800">Total</td>';
+
+                // Reconstrói o cabeçalho com base na nova ordem de playersData
+                playersData.forEach(player => {
+                    const th = document.createElement('th');
+                    th.className = 'p-3 border-r border-emerald-800 draggable-header';
+                    th.textContent = player.name;
+                    th.setAttribute('data-player-id', player.id);
+                    th.setAttribute('draggable', 'true');
+                    theadRow.appendChild(th);
+                });
+                addDragDropListeners(); // Re-adiciona listeners aos novos cabeçalhos
+
+                // Reconstrói as linhas do corpo com base na nova ordem de playersData e pontuações armazenadas
+                roundsData.forEach(roundData => {
+                    const newRow = document.createElement('tr');
+                    newRow.className = 'border-b border-gray-200';
+                    newRow.setAttribute('data-round', roundData.round);
+
+                    const roundCell = document.createElement('td');
+                    roundCell.className = 'p-3 border-r border-gray-300 font-semibold';
+                    roundCell.textContent = roundData.round;
+                    newRow.appendChild(roundCell);
+
+                    playersData.forEach(player => {
+                        const scoreCell = document.createElement('td');
+                        scoreCell.className = 'p-3 border-r border-gray-300';
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.value = roundData.scores[player.id] !== undefined ? roundData.scores[player.id] : '0';
+                        input.min = '0';
+                        input.className = 'table-cell-input';
+                        input.setAttribute('data-player-id', player.id);
+                        input.addEventListener('input', updateTotals);
+                        scoreCell.appendChild(input);
+                        newRow.appendChild(scoreCell);
+                    });
+                    tbody.appendChild(newRow);
+                });
+
+                // Reconstrói os totais do rodapé com base na nova ordem de playersData
+                playersData.forEach(player => {
+                    const tdTotal = document.createElement('td');
+                    tdTotal.id = `total-player-${player.id}`;
+                    tdTotal.className = 'p-3 text-center';
+                    tdTotal.textContent = player.totalScore; // Usa o total atualizado de playersData
+                    tfootRow.appendChild(tdTotal);
+                });
+            }
+
+            // Função para finalizar o jogo e exibir o ranking
+            function finalizeGame() {
+                scoreSection.classList.add('hidden');
+                rankingSection.classList.remove('hidden');
+
+                // playersData já contém totalScore atualizado
+                // Classifica playersData diretamente
+                playersData.sort((a, b) => b.totalScore - a.totalScore);
+
+                renderRanking(playersData); // Passa playersData classificado
+            }
+
+            // Função para renderizar o ranking (pódio e lista)
+            function renderRanking(players) {
+                podiumContainer.innerHTML = '';
+                otherPlayersList.innerHTML = '';
+
+                // Cria elementos do pódio
+                const podiumOrder = [
+                    { place: 2, className: 'second', label: '2º' },
+                    { place: 1, className: 'first', label: '1º' },
+                    { place: 3, className: 'third', label: '3º' }
+                ];
+
+                // Ordena a ordem do pódio para renderizar visualmente 2º, 1º, 3º
+                podiumOrder.sort((a, b) => a.place - b.place);
+
+                podiumOrder.forEach(podiumInfo => {
+                    const playerIndex = podiumInfo.place - 1; // Índice 0-baseado do array
+                    if (players[playerIndex]) {
+                        const player = players[playerIndex];
+                        const podiumStep = document.createElement('div');
+                        podiumStep.className = `podium-step ${podiumInfo.className}`;
+                        
+                        let crown = '';
+                        if (podiumInfo.place === 1) {
+                            crown = '<span class="podium-crown">👑</span>';
+                        }
+
+                        podiumStep.innerHTML = `
+                            ${crown}
+                            <div class="podium-place">${podiumInfo.label}</div>
+                            <div class="podium-player-name">${player.name}</div>
+                            <div class="podium-score">${player.totalScore} pontos</div>
+                        `;
+                        podiumContainer.appendChild(podiumStep);
+                    }
+                });
+
+                // Adiciona os jogadores restantes à lista
+                for (let i = 3; i < players.length; i++) {
+                    const player = players[i];
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `${player.name}: ${player.totalScore} pontos`;
+                    otherPlayersList.appendChild(listItem);
+                }
+
+                // Ajusta a exibição do pódio se houver menos de 3 jogadores
+                if (players.length < 3) {
+                    const actualPodiumSteps = podiumContainer.querySelectorAll('.podium-step');
+                    if (players.length === 2) {
+                        // Remove o 3º lugar se houver apenas 2 jogadores
+                        const thirdPlace = podiumContainer.querySelector('.podium-step.third');
+                        if (thirdPlace) thirdPlace.remove();
+                    }
+                }
+            }
+
+            // Função para reiniciar o jogo
+            function resetGame() {
+                rankingSection.classList.add('hidden');
+                setupSection.classList.remove('hidden');
+                playerNamesInputGroup.classList.add('hidden'); // Garante que a entrada de nomes esteja oculta
+                numPlayersInputGroup.classList.remove('hidden'); // Mostra a entrada de quantidade de jogadores
+                numPlayersInput.value = 2; // Redefine a entrada de contagem de jogadores
+                playersData = []; // Limpa os dados dos jogadores
+                currentRound = 1; // Redefine o contador de rodadas
+                currentRoundSpan.textContent = currentRound; // Atualiza a exibição da rodada
+                scoreTable.querySelector('tbody').innerHTML = ''; // Limpa o corpo da tabela
+                scoreTable.querySelector('tfoot tr').innerHTML = '<td class="p-3 border-r border-emerald-800">Total</td>'; // Limpa os totais do rodapé
+                podiumContainer.innerHTML = ''; // Limpa o pódio
+                otherPlayersList.innerHTML = ''; // Limpa a lista de outros jogadores
+            }
+        });
+    </script>
+</body>
+</html>
